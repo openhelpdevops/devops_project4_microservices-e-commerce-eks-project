@@ -1,0 +1,116 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: dev   # ✅ ADDED DEV NAMESPACE
+spec:
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+      annotations:
+        sidecar.istio.io/rewriteAppHTTPProbers: "true"
+    spec:
+      imagePullSecrets:
+        - name: nexus-secret
+
+      serviceAccountName: default
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+
+      containers:
+        - name: server
+          image: nexus.openhelp.net/docker-private/sreejith/frontend:1
+          ports:
+            - containerPort: 8080
+
+          readinessProbe:
+            initialDelaySeconds: 10
+            httpGet:
+              path: "/_healthz"
+              port: 8080
+              httpHeaders:
+                - name: "Cookie"
+                  value: "shop_session-id=x-readiness-probe"
+
+          livenessProbe:
+            initialDelaySeconds: 10
+            httpGet:
+              path: "/_healthz"
+              port: 8080
+              httpHeaders:
+                - name: "Cookie"
+                  value: "shop_session-id=x-liveness-probe"
+
+          env:
+            - name: PORT
+              value: "8080"
+            - name: PRODUCT_CATALOG_SERVICE_ADDR
+              value: "productcatalogservice.dev.svc.cluster.local:3550"
+            - name: CURRENCY_SERVICE_ADDR
+              value: "currencyservice.dev.svc.cluster.local:7000"
+            - name: CART_SERVICE_ADDR
+              value: "cartservice.dev.svc.cluster.local:7070"
+            - name: RECOMMENDATION_SERVICE_ADDR
+              value: "recommendationservice.dev.svc.cluster.local:8080"
+            - name: SHIPPING_SERVICE_ADDR
+              value: "shippingservice.dev.svc.cluster.local:50051"
+            - name: CHECKOUT_SERVICE_ADDR
+              value: "checkoutservice.dev.svc.cluster.local:5050"
+            - name: AD_SERVICE_ADDR
+              value: "adservice.dev.svc.cluster.local:9555"
+            - name: ENV_PLATFORM
+              value: "aws"
+            - name: ENABLE_PROFILER
+              value: "0"
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: dev   # ✅ DEV NAMESPACE
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-external
+  namespace: dev   # ✅ DEV NAMESPACE
+spec:
+  type: LoadBalancer
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

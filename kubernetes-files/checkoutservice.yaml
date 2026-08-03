@@ -1,0 +1,115 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkoutservice
+  namespace: dev
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: checkoutservice
+
+  template:
+    metadata:
+      labels:
+        app: checkoutservice
+
+    spec:
+      serviceAccountName: default
+
+      imagePullSecrets:
+      - name: nexus-secret
+
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+
+      containers:
+      - name: server
+
+        image: nexus.openhelp.net/docker-private/sreejith/checkoutservice:1
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 5050
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+
+        env:
+        - name: PORT
+          value: "5050"
+        - name: PRODUCT_CATALOG_SERVICE_ADDR
+          value: "productcatalogservice:3550"
+        - name: SHIPPING_SERVICE_ADDR
+          value: "shippingservice:50051"
+        - name: PAYMENT_SERVICE_ADDR
+          value: "paymentservice:50051"
+        - name: EMAIL_SERVICE_ADDR
+          value: "emailservice:5000"
+        - name: CURRENCY_SERVICE_ADDR
+          value: "currencyservice:7000"
+        - name: CART_SERVICE_ADDR
+          value: "cartservice:7070"
+
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+        startupProbe:
+          tcpSocket:
+            port: 5050
+          failureThreshold: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          grpc:
+            port: 5050
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+        livenessProbe:
+          grpc:
+            port: 5050
+          initialDelaySeconds: 20
+          periodSeconds: 15
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkoutservice
+  namespace: dev
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: checkoutservice
+
+  ports:
+  - name: grpc
+    port: 5050
+    targetPort: 5050

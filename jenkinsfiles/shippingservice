@@ -1,0 +1,117 @@
+pipeline {
+
+    agent any
+
+    tools {
+        maven "Maven3.9.15"
+    }
+
+    environment {
+
+        // Nexus Docker Registry
+        REGISTRY_URL = 'nexus.openhelp.net'
+        REPO         = 'docker-private/sreejith'
+        IMAGE        = 'shippingservice'
+        TAG          = "${BUILD_NUMBER}"
+
+        NEXUS_CREDS = credentials('nexus-cred')
+
+        // GitLab Credentials
+        GITLAB_CREDS = credentials('sreejithgit')
+
+        // GitLab Repo Info
+        GIT_REPO_NAME = "microservices-e-commerce-eks-project"
+        GIT_USER_NAME = "sreejith"
+        GIT_EMAIL     = "sreejithedl@gmail.com"
+
+        // Kubernetes YAML
+        YAML_FILE = "shippingservice.yaml"
+
+        // Image path
+        IMAGE_PATH = "${REGISTRY_URL}/${REPO}/${IMAGE}:${TAG}"
+    }
+
+    stages {
+
+        stage('Cleaning Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
+        stage('Clone Repo') {
+            steps {
+                git branch: 'main',
+                    credentialsId: 'sreejithgit',
+                    url: 'https://gitlab.openhelp.net/sreejith/microservices-e-commerce-eks-project.git'
+            }
+        }
+
+        stage('Docker Build & Push') {
+
+            steps {
+
+                script {
+
+                    // ✅ correct source path for Dockerfile
+                    dir('src/shippingservice') {
+
+                        sh '''
+                            echo "Cleaning Docker system"
+                            docker system prune -f
+                            docker container prune -f
+
+                            echo "Building Docker Image"
+                            docker build -t $REGISTRY_URL/$REPO/$IMAGE:$TAG .
+
+                            echo "Logging into Nexus"
+                            echo "$NEXUS_CREDS_PSW" | docker login $REGISTRY_URL -u "$NEXUS_CREDS_USR" --password-stdin
+
+                            echo "Pushing Docker Image"
+                            docker push $REGISTRY_URL/$REPO/$IMAGE:$TAG
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Update Kubernetes Deployment File') {
+
+            steps {
+
+                dir('kubernetes-files') {
+
+                    sh '''
+                        git config user.email "${GIT_EMAIL}"
+                        git config user.name "${GIT_USER_NAME}"
+
+                        echo "Updating Kubernetes YAML..."
+
+                        sed -i "s#image:.*#image: ${IMAGE_PATH}#g" ${YAML_FILE}
+
+                        cat ${YAML_FILE}
+
+                        git add .
+
+                        git commit -m "Update shipping service  image to ${BUILD_NUMBER}" || echo "No changes to commit"
+
+                        echo "Pushing to GitLab"
+
+                        git push https://${GITLAB_CREDS_USR}:${GITLAB_CREDS_PSW}@gitlab.openhelp.net/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo "PIPELINE SUCCESS 🚀"
+        }
+
+        failure {
+            echo "PIPELINE FAILED ❌"
+        }
+    }
+}

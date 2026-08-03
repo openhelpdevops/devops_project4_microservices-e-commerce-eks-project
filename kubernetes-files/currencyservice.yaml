@@ -1,0 +1,108 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: currencyservice
+  namespace: dev
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: currencyservice
+
+  template:
+    metadata:
+      labels:
+        app: currencyservice
+
+    spec:
+      serviceAccountName: default
+
+      imagePullSecrets:
+      - name: nexus-secret
+
+      terminationGracePeriodSeconds: 5
+
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+
+      containers:
+      - name: server
+
+        image: nexus.openhelp.net/docker-private/sreejith/currencyservice:1
+        imagePullPolicy: Always
+
+        ports:
+        - name: grpc
+          containerPort: 7000
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+
+        env:
+        - name: PORT
+          value: "7000"
+        - name: DISABLE_PROFILER
+          value: "1"
+
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+        startupProbe:
+          tcpSocket:
+            port: 7000
+          failureThreshold: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          grpc:
+            port: 7000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+        livenessProbe:
+          grpc:
+            port: 7000
+          initialDelaySeconds: 20
+          periodSeconds: 15
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: currencyservice
+  namespace: dev
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: currencyservice
+
+  ports:
+  - name: grpc
+    port: 7000
+    targetPort: 7000
