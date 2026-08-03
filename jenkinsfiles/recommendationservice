@@ -19,16 +19,19 @@ pipeline {
         // GitLab Credentials
         GITLAB_CREDS = credentials('sreejithgit')
 
-        // GitLab Repo Info
+        // GitLab Repository Information
         GIT_REPO_NAME = "microservices-e-commerce-eks-project"
         GIT_USER_NAME = "sreejith"
         GIT_EMAIL     = "sreejithedl@gmail.com"
 
-        // Kubernetes YAML
+        // Kubernetes Deployment YAML
         YAML_FILE = "recommendationservice.yaml"
 
-        // Image path
+        // Complete Nexus image path
         IMAGE_PATH = "${REGISTRY_URL}/${REPO}/${IMAGE}:${TAG}"
+
+        // Unique GitOps branch for each Jenkins build
+        GITOPS_BRANCH = "gitops-recommendationservice-${BUILD_NUMBER}"
     }
 
     stages {
@@ -53,22 +56,31 @@ pipeline {
 
                 script {
 
-                    // ✅ correct source path for Dockerfile
+                    // Directory containing the recommendationservice Dockerfile
                     dir('src/recommendationservice') {
 
                         sh '''
-                            echo "Cleaning Docker system"
+                            set -e
+
+                            echo "Cleaning unused Docker resources"
                             docker system prune -f
                             docker container prune -f
 
-                            echo "Building Docker Image"
-                            docker build -t $REGISTRY_URL/$REPO/$IMAGE:$TAG .
+                            echo "Building Docker image"
+                            docker build \
+                                -t "$REGISTRY_URL/$REPO/$IMAGE:$TAG" \
+                                .
 
-                            echo "Logging into Nexus"
-                            echo "$NEXUS_CREDS_PSW" | docker login $REGISTRY_URL -u "$NEXUS_CREDS_USR" --password-stdin
+                            echo "Logging into Nexus Docker Registry"
+                            echo "$NEXUS_CREDS_PSW" | docker login "$REGISTRY_URL" \
+                                -u "$NEXUS_CREDS_USR" \
+                                --password-stdin
 
-                            echo "Pushing Docker Image"
-                            docker push $REGISTRY_URL/$REPO/$IMAGE:$TAG
+                            echo "Pushing Docker image to Nexus"
+                            docker push "$REGISTRY_URL/$REPO/$IMAGE:$TAG"
+
+                            echo "Docker image pushed successfully:"
+                            echo "$IMAGE_PATH"
                         '''
                     }
                 }
@@ -82,22 +94,42 @@ pipeline {
                 dir('kubernetes-files') {
 
                     sh '''
+                        set -e
+
+                        echo "Configuring Git identity"
                         git config user.email "${GIT_EMAIL}"
                         git config user.name "${GIT_USER_NAME}"
 
-                        echo "Updating Kubernetes YAML..."
+                        echo "Creating GitOps branch: ${GITOPS_BRANCH}"
+                        git checkout -b "${GITOPS_BRANCH}"
 
-                        sed -i "s#image:.*#image: ${IMAGE_PATH}#g" ${YAML_FILE}
+                        echo "Updating Kubernetes YAML file: ${YAML_FILE}"
 
-                        cat ${YAML_FILE}
+                        sed -i \
+                            "s#image:.*#image: ${IMAGE_PATH}#g" \
+                            "${YAML_FILE}"
 
-                        git add .
+                        echo "Updated Kubernetes deployment file:"
+                        cat "${YAML_FILE}"
 
-                        git commit -m "Update recommendation  service  image to ${BUILD_NUMBER}" || echo "No changes to commit"
+                        git add "${YAML_FILE}"
 
-                        echo "Pushing to GitLab"
+                        if git diff --cached --quiet; then
+                            echo "No Kubernetes YAML changes to commit"
+                        else
+                            git commit \
+                                -m "Update recommendationservice image to ${TAG}"
+                        fi
 
-                        git push https://${GITLAB_CREDS_USR}:${GITLAB_CREDS_PSW}@gitlab.openhelp.net/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+                        echo "Pushing GitOps branch and creating Merge Request"
+
+                        git push \
+                            "https://${GITLAB_CREDS_USR}:${GITLAB_CREDS_PSW}@gitlab.openhelp.net/${GIT_USER_NAME}/${GIT_REPO_NAME}.git" \
+                            "HEAD:${GITOPS_BRANCH}" \
+                            -o merge_request.create \
+                            -o merge_request.target=main \
+                            -o merge_request.remove_source_branch \
+                            -o merge_request.title="Deploy recommendationservice image ${TAG}"
                     '''
                 }
             }
@@ -108,10 +140,20 @@ pipeline {
 
         success {
             echo "PIPELINE SUCCESS 🚀"
+            echo "Recommendationservice Docker image pushed to Nexus: ${IMAGE_PATH}"
+            echo "GitLab Merge Request created."
+            echo "Review, approve and merge the GitOps branch into main."
         }
 
         failure {
             echo "PIPELINE FAILED ❌"
+            echo "Check the Jenkins console output for the failed stage."
+        }
+
+        always {
+            sh '''
+                docker logout "$REGISTRY_URL" >/dev/null 2>&1 || true
+            '''
         }
     }
 }

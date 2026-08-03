@@ -29,6 +29,9 @@ pipeline {
 
         // Image path
         IMAGE_PATH = "${REGISTRY_URL}/${REPO}/${IMAGE}:${TAG}"
+
+        // GitOps branch created by Jenkins
+        GITOPS_BRANCH = "gitops-checkoutservice-${BUILD_NUMBER}"
     }
 
     stages {
@@ -53,7 +56,6 @@ pipeline {
 
                 script {
 
-                    // ✅ correct source path for Dockerfile
                     dir('src/checkoutservice') {
 
                         sh '''
@@ -65,7 +67,9 @@ pipeline {
                             docker build -t $REGISTRY_URL/$REPO/$IMAGE:$TAG .
 
                             echo "Logging into Nexus"
-                            echo "$NEXUS_CREDS_PSW" | docker login $REGISTRY_URL -u "$NEXUS_CREDS_USR" --password-stdin
+                            echo "$NEXUS_CREDS_PSW" | docker login $REGISTRY_URL \
+                                -u "$NEXUS_CREDS_USR" \
+                                --password-stdin
 
                             echo "Pushing Docker Image"
                             docker push $REGISTRY_URL/$REPO/$IMAGE:$TAG
@@ -85,19 +89,30 @@ pipeline {
                         git config user.email "${GIT_EMAIL}"
                         git config user.name "${GIT_USER_NAME}"
 
+                        echo "Creating GitOps branch..."
+                        git checkout -b "${GITOPS_BRANCH}"
+
                         echo "Updating Kubernetes YAML..."
 
-                        sed -i "s#image:.*#image: ${IMAGE_PATH}#g" ${YAML_FILE}
+                        sed -i "s#image:.*#image: ${IMAGE_PATH}#g" "${YAML_FILE}"
 
-                        cat ${YAML_FILE}
+                        cat "${YAML_FILE}"
 
-                        git add .
+                        git add "${YAML_FILE}"
 
-                        git commit -m "Update adservice image to ${BUILD_NUMBER}" || echo "No changes to commit"
+                        git commit \
+                            -m "Update checkoutservice image to ${TAG}" \
+                            || echo "No changes to commit"
 
-                        echo "Pushing to GitLab"
+                        echo "Pushing GitOps branch and creating Merge Request..."
 
-                        git push https://${GITLAB_CREDS_USR}:${GITLAB_CREDS_PSW}@gitlab.openhelp.net/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+                        git push \
+                            https://${GITLAB_CREDS_USR}:${GITLAB_CREDS_PSW}@gitlab.openhelp.net/${GIT_USER_NAME}/${GIT_REPO_NAME}.git \
+                            HEAD:${GITOPS_BRANCH} \
+                            -o merge_request.create \
+                            -o merge_request.target=main \
+                            -o merge_request.remove_source_branch \
+                            -o merge_request.title="Deploy checkoutservice image ${TAG}"
                     '''
                 }
             }
@@ -108,6 +123,7 @@ pipeline {
 
         success {
             echo "PIPELINE SUCCESS 🚀"
+            echo "Merge Request created. Review, approve and merge it into main."
         }
 
         failure {
