@@ -160,8 +160,489 @@ The frontend manifest provides:
 ---
 
 # PART I — Prepare GitLab and migrate the repository
+## 4.0 Configure jenkins plugins
 
-## 4. Clone the GitHub repository
+
+### Navigation
+
+```text
+Jenkins → Manage Jenkins → Plugins
+```
+
+### Install the following plugins
+
+```text
+Eclipse Temurin installer Plugin
+Config File Provider Plugin
+Pipeline Maven Integration
+Docker Pipeline
+Docker plugin
+SonarQube Scanner for Jenkins
+Kubernetes plugin
+Kubernetes Credentials
+Kubernetes CLI Plugin
+Kubernetes Client API Plugin
+Maven Integration plugin
+Pipeline Maven Integration
+Pipeline Maven Plugin API
+Pipeline: Stage View Plugin
+Docker
+Docker Commons
+Docker Pipeline
+Docker API
+docker-build-step
+Pipeline Stage View
+Email Extension Plugin
+Prometheus metrics
+```
+
+### Explanation
+
+These plugins provide:
+
+- Automatic JDK installation
+- Maven integration
+- Docker build and push support
+- SonarQube integration
+- Kubernetes access
+- Managed Maven settings
+- Pipeline-stage visualization
+
+> Some entries may overlap because one plugin can install related dependencies automatically. Keeping all listed entries ensures the required functionality is available.
+
+---
+
+## 3. Configure Jenkins Tools
+
+### Navigation
+
+```text
+Jenkins → Manage Jenkins → Tools
+```
+
+---
+
+### 3.1 Configure JDK 17
+
+Click:
+
+```text
+JDK installations → Add JDK
+```
+
+Configure:
+
+```text
+Name: jdk17
+Install automatically: Enabled
+Installer: Install from adoptium.net
+Version: jdk-17.0.19+10
+```
+
+### Explanation
+
+The name `jdk17` must exactly match the tool name referenced in the Jenkins pipeline.
+
+Example:
+
+```groovy
+tools {
+    jdk 'jdk17'
+}
+```
+
+---
+
+### 3.2 Configure SonarQube Scanner
+
+Click:
+
+```text
+SonarQube Scanner installations → Add SonarQube Scanner
+```
+
+Configure:
+
+```text
+Name: sonar-scanner
+Install automatically: Enabled
+Installer: Install from Maven Central
+Version: SonarQube Scanner 8.1.0.6389
+```
+
+### Explanation
+
+The name `sonar-scanner` is later referenced by the Jenkins pipeline.
+
+Example:
+
+```groovy
+SCANNER_HOME = tool 'sonar-scanner'
+```
+
+---
+
+### 3.3 Configure Maven
+
+Click:
+
+```text
+Maven installations → Add Maven
+```
+
+Configure:
+
+```text
+Name: Maven3.9.15
+Install automatically: Enabled
+Installer: Install from Apache
+Version: 3.9.15
+```
+
+### Explanation
+
+The name must match the Jenkinsfile tool declaration.
+
+```groovy
+tools {
+    maven 'Maven3.9.15'
+}
+```
+
+---
+
+### 3.4 Configure Docker
+
+Click:
+
+```text
+Docker installations → Add Docker
+```
+
+Configure:
+
+```text
+Name: docker
+Install automatically: Enabled
+Installer: Download from docker.com
+Docker version: latest
+```
+
+### Explanation
+
+This makes the Docker CLI available to Jenkins jobs that use the configured tool.
+
+---
+
+## 4. Configure Jenkins Credentials
+
+### Navigation
+
+```text
+Jenkins → Manage Jenkins → Credentials
+```
+
+Select:
+
+```text
+Add credentials>> Username with password>> global
+```
+
+---
+
+### 4.1 GitLab Credentials
+
+Select:
+
+```text
+Kind: Username with password
+Scope: Global
+```
+
+Configure:
+
+```text
+Username: sreejith
+Password: <GITLAB_ACCESS_TOKEN>
+ID: sreejithgit
+Description: sreejithgit
+```
+
+### Explanation
+
+The password field stores the GitLab personal access token. The Jenkins pipeline refers to the credential by ID:
+
+```groovy
+credentialsId: 'sreejithgit'
+```
+
+---
+
+### 4.2 Nexus Credentials
+
+Select:
+
+```text
+Kind: Username with password
+Scope: Global
+```
+
+Configure:
+
+```text
+Username: admin
+Password: <NEXUS_PASSWORD>
+ID: nexus-cred
+Description: nexus-cred
+```
+
+### Explanation
+
+Use a Nexus account that has permission to:
+
+- Upload Maven artifacts
+- Push Docker images
+- Read required repositories
+
+Avoid using the Nexus administrator account in production. Create a dedicated service account with only the required privileges.
+
+---
+
+### 4.3 Gmail Credentials
+
+Select:
+
+```text
+Kind: Username with password
+Scope: Global
+```
+
+Configure:
+
+```text
+Username: sreejithedl@gmail.com
+Password: <GMAIL_APPLICATION_PASSWORD>
+ID: mail-cred
+Description: mail-cred
+```
+
+### Explanation
+
+Use a Gmail application password, not the normal Gmail account password.
+
+Also go to:
+
+Jenkins
+→ Manage Jenkins
+→ System
+
+Find:
+
+Jenkins Location
+
+and set:
+System Admin e-mail address: sreejithedl@gmail.com
+
+This is the one we configured with Gmail SMTP
+
+---
+
+## 5. Configure SonarQube
+
+### SonarQube URL
+
+```text
+https://sonar.openhelp.net
+```
+
+Log in using a SonarQube administrator account.
+
+---
+
+### 5.1 Generate a SonarQube Token
+
+Navigate to:
+
+```text
+Administration → Security → Users
+```
+
+Locate the administrator user.
+
+Click:
+
+```text
+Three-dot menu → Tokens
+```
+
+Create:
+
+```text
+Token name: sonar-token
+Expiration: 1 year
+```
+
+Example result:
+
+```text
+Name: sonar-token
+Token: <REDACTED_SONAR_TOKEN>
+```
+
+### Explanation
+
+The token allows Jenkins to authenticate with SonarQube without storing the SonarQube administrator password.
+
+---
+
+### 5.2 Create the SonarQube Webhook
+
+Navigate to:
+
+```text
+SonarQube → Administration → Configuration → Webhooks
+```
+
+Click:
+
+```text
+Create
+```
+
+Configure:
+
+```text
+Name: jenkins
+URL: https://jenkins.openhelp.net/sonarqube-webhook
+```
+
+Click:
+
+```text
+Save
+```
+
+### Explanation
+
+The webhook sends SonarQube quality-gate results back to Jenkins. This is required when the pipeline uses:
+
+```groovy
+waitForQualityGate()
+```
+
+---
+
+## 6. Store the SonarQube Token in Jenkins
+
+Navigate to:
+
+```text
+Jenkins → Manage Jenkins → Credentials
+```
+
+Select:
+
+```text
+Add Credentials
+Kind: Secret text
+Scope: Global
+```
+
+Configure:
+
+```text
+Secret: <SONARQUBE_TOKEN>
+ID: sonar-token
+Description: sonar-token
+```
+
+### Explanation
+
+The credential ID must match the token selected in Jenkins SonarQube system configuration.
+
+---
+
+## 7. Configure SonarQube Server in Jenkins
+
+Navigate to:
+
+```text
+Jenkins → Manage Jenkins → System
+```
+
+Find:
+
+```text
+SonarQube installations
+```
+
+Click:
+
+```text
+Add SonarQube
+```
+
+Configure:
+
+```text
+Name: sonarQube
+Server URL: https://sonar.openhelp.net/
+Server authentication token: sonar-token
+```
+
+### Explanation
+
+The name `sonarQube` must match the value used in the pipeline.
+
+Example:
+
+```groovy
+withSonarQubeEnv('sonarQube') {
+    sh 'mvn sonar:sonar'
+}
+```
+
+---
+
+## 8. Configure Gmail SMTP in Jenkins
+
+Navigate to:
+
+```text
+Jenkins → Manage Jenkins → System
+```
+
+Find:
+
+```text
+Extended E-mail Notification
+```
+
+Configure:
+
+```text
+SMTP server: smtp.gmail.com
+SMTP port: 465
+Credentials: mail-cred
+Use SSL: Enabled
+```
+
+Save the configuration.
+
+Restart Jenkins only if required.
+
+### Explanation
+
+Port `465` uses SMTP over SSL. The `mail-cred` Jenkins credential supplies the Gmail address and application password.
+
+---
+
+
+
+
+
+
+## 4.1. Clone the GitHub repository
 
 Run this on the workstation or server used for repository migration:
 
