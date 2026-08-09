@@ -159,7 +159,7 @@ The frontend manifest provides:
 
 ---
 
-# PART I — Prepare GitLab and migrate the repository
+# PART I — Prepare Jenkins, GitLab and migrate the repository
 ## 4.0 Configure jenkins plugins
 
 
