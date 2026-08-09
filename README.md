@@ -484,35 +484,8 @@ kubectl get l2advertisements -n metallb-system
 
 A Layer 2 MetalLB configuration generally requires an `IPAddressPool` and an `L2Advertisement`.
 
-Example only—use the pool already configured in your cluster:
 
-```yaml
-apiVersion: metallb.io/v1beta1
-kind: IPAddressPool
-metadata:
-  name: internal-pool
-  namespace: metallb-system
-spec:
-  addresses:
-    - 192.168.0.240-192.168.0.250
----
-apiVersion: metallb.io/v1beta1
-kind: L2Advertisement
-metadata:
-  name: internal-l2
-  namespace: metallb-system
-spec:
-  ipAddressPools:
-    - internal-pool
-```
 
-Apply only if MetalLB is not already configured:
-
-```bash
-kubectl apply -f metallb-pool.yaml
-```
-
-Make sure these IPs are outside DHCP allocation and are unused elsewhere.
 
 ---
 
@@ -537,7 +510,8 @@ For reproducible production installation, pin a reviewed Argo CD release instead
 The common stable installation command is:
 
 ```bash
-kubectl apply -n argocd \
+kubectl apply --server-side --force-conflicts \
+  -n argocd \
   -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 ```
 
@@ -564,7 +538,46 @@ kubectl rollout status statefulset/argocd-application-controller \
 To list the main workload resources:
 
 ```bash
-kubectl get all -n argocd
+
+root@kube2:~# kubectl get all -n argocd
+NAME                                                    READY   STATUS    RESTARTS       AGE
+pod/argocd-application-controller-0                     1/1     Running   0              3m27s
+pod/argocd-applicationset-controller-7f7b6c9856-xmgts   1/1     Running   0              3m32s
+pod/argocd-dex-server-6b857cf79c-bfxwr                  1/1     Running   1 (118s ago)   3m32s
+pod/argocd-notifications-controller-5f5fbbbd8-mszsp     1/1     Running   0              3m32s
+pod/argocd-redis-65fc4c87dc-tgb6g                       1/1     Running   0              3m31s
+pod/argocd-repo-server-7c4b587448-v6tmk                 1/1     Running   0              3m30s
+pod/argocd-server-767dfcb8f9-mr48w                      1/1     Running   0              3m29s
+
+NAME                                              TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+service/argocd-applicationset-controller          ClusterIP   10.101.41.212    <none>        7000/TCP,8080/TCP            3m34s
+service/argocd-dex-server                         ClusterIP   10.102.21.19     <none>        5556/TCP,5557/TCP,5558/TCP   3m34s
+service/argocd-metrics                            ClusterIP   10.107.251.144   <none>        8082/TCP                     3m34s
+service/argocd-notifications-controller-metrics   ClusterIP   10.109.206.158   <none>        9001/TCP                     3m34s
+service/argocd-redis                              ClusterIP   10.101.207.149   <none>        6379/TCP                     3m33s
+service/argocd-repo-server                        ClusterIP   10.102.246.57    <none>        8081/TCP,8084/TCP            3m33s
+service/argocd-server                             ClusterIP   10.103.115.96    <none>        80/TCP,443/TCP               3m33s
+service/argocd-server-metrics                     ClusterIP   10.102.29.187    <none>        8083/TCP                     3m33s
+
+NAME                                               READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/argocd-applicationset-controller   1/1     1            1           3m32s
+deployment.apps/argocd-dex-server                  1/1     1            1           3m32s
+deployment.apps/argocd-notifications-controller    1/1     1            1           3m32s
+deployment.apps/argocd-redis                       1/1     1            1           3m32s
+deployment.apps/argocd-repo-server                 1/1     1            1           3m31s
+deployment.apps/argocd-server                      1/1     1            1           3m30s
+
+NAME                                                          DESIRED   CURRENT   READY   AGE
+replicaset.apps/argocd-applicationset-controller-7f7b6c9856   1         1         1       3m32s
+replicaset.apps/argocd-dex-server-6b857cf79c                  1         1         1       3m32s
+replicaset.apps/argocd-notifications-controller-5f5fbbbd8     1         1         1       3m32s
+replicaset.apps/argocd-redis-65fc4c87dc                       1         1         1       3m32s
+replicaset.apps/argocd-repo-server-7c4b587448                 1         1         1       3m30s
+replicaset.apps/argocd-server-767dfcb8f9                      1         1         1       3m29s
+
+NAME                                             READY   AGE
+statefulset.apps/argocd-application-controller   1/1     3m29s
+
 ```
 
 Typical resources include:
@@ -601,7 +614,25 @@ done
 
 ---
 
-# PART IV — Expose Argo CD through MetalLB
+# PART IV — Expose Argo CD through 
+
+```text
+root@kube2:~#  kubectl get svc -n argocd
+NAME                                      TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+argocd-applicationset-controller          ClusterIP   10.101.41.212    <none>        7000/TCP,8080/TCP            4m26s
+argocd-dex-server                         ClusterIP   10.102.21.19     <none>        5556/TCP,5557/TCP,5558/TCP   4m26s
+argocd-metrics                            ClusterIP   10.107.251.144   <none>        8082/TCP                     4m26s
+argocd-notifications-controller-metrics   ClusterIP   10.109.206.158   <none>        9001/TCP                     4m26s
+argocd-redis                              ClusterIP   10.101.207.149   <none>        6379/TCP                     4m25s
+argocd-repo-server                        ClusterIP   10.102.246.57    <none>        8081/TCP,8084/TCP            4m25s
+argocd-server                             ClusterIP   10.103.115.96    <none>        80/TCP,443/TCP               4m25s
+argocd-server-metrics                     ClusterIP   10.102.29.187    <none>        8083/TCP                     4m25s
+```
+Because Kubernetes deploys services to arbitrary network addresses inside your cluster, you’ll need to forward the relevant ports in order to access them from your local machine. 
+Argo CD sets up a service named argocd-server on port 443 internally. Because port 443 is the default HTTPS port, and you may be running some other HTTP/HTTPS services,
+it’s common practice to forward those to arbitrarily chosen other ports, like 8080, like so:
+
+
 
 ## 18. Change `argocd-server` to `LoadBalancer`
 
@@ -649,6 +680,7 @@ Access the UI:
 ```text
 https://192.168.0.242
 ```
+
 
 A browser warning is expected when the Argo CD API server presents its default self-signed certificate.
 
@@ -862,54 +894,48 @@ Context '192.168.0.242' updated
 
 ## 25. Export the CA certificate correctly
 
-For production, add the **internal CA certificate** that signed `gitlab.openhelp.net`, not merely a short-lived leaf server certificate.
-
-If the internal CA certificate is available, save it as:
+Download ca certificate from gitlab server
 
 ```text
-openhelp-root-ca.crt
+scp root@gitlab.openhelp.net:/etc/ipa/ca.crt /root/gitlab-ca.crt
 ```
 
-If only the server chain is available for inspection:
+List the certificates
 
 ```bash
-openssl s_client \
-  -showcerts \
-  -connect gitlab.openhelp.net:443 \
-  -servername gitlab.openhelp.net \
-  </dev/null
+root@kube2:~# argocd cert list
+HOSTNAME                 TYPE   SUBTYPE              INFO
+[ssh.github.com]:443     ssh    ecdsa-sha2-nistp256  SHA256:p2QAMXNIC1TJYWeIOttrVc98/R1BUFWu3/LiyKgUfQM
+[ssh.github.com]:443     ssh    ssh-ed25519          SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+[ssh.github.com]:443     ssh    ssh-rsa              SHA256:uNiVztksCsDhcc0u9e8BujQXVUpKZIDTMczCvj3tD2s
+bitbucket.org            ssh    ecdsa-sha2-nistp256  SHA256:FC73VB6C4OQLSCrjEayhMp9UMxS97caD/Yyi2bhW/J0
+bitbucket.org            ssh    ssh-ed25519          SHA256:ybgmFkzwOSotHTHLJgHO0QN8L0xErw6vd0VhFA9m3SM
+bitbucket.org            ssh    ssh-rsa              SHA256:46OSHA1Rmj8E8ERTC6xkNcmGOw9oFxYr0WF6zWW8l1E
+github.com               ssh    ecdsa-sha2-nistp256  SHA256:p2QAMXNIC1TJYWeIOttrVc98/R1BUFWu3/LiyKgUfQM
+github.com               ssh    ssh-ed25519          SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+github.com               ssh    ssh-rsa              SHA256:uNiVztksCsDhcc0u9e8BujQXVUpKZIDTMczCvj3tD2s
+gitlab.com               ssh    ecdsa-sha2-nistp256  SHA256:HbW3g8zUjNSksFbqTiUWPWg2Bq1x8xdGUrliXFzSnUw
+gitlab.com               ssh    ssh-ed25519          SHA256:eUXGGm1YGsMAS7vkcx6JOJdOGHPem5gQp4taiCfCLB8
+gitlab.com               ssh    ssh-rsa              SHA256:ROQFvPThGrW4RuWLoL9tq9I9zJ42fK4XywyRtbOz/EQ
+gitlab.openhelp.net      https  rsa                  CN=Certificate Authority,O=OPENHELP.NET
+ssh.dev.azure.com        ssh    ssh-rsa              SHA256:ohD8VZEXGWo6Ez8GSEJQ9WpafgLFsOfLOtGGQCQo6Og
+vs-ssh.visualstudio.com  ssh    ssh-rsa              SHA256:ohD8VZEXGWo6Ez8GSEJQ9WpafgLFsOfLOtGGQCQo6Og
+
+```
+Remove existing https certificates
+```bash
+argocd cert rm --cert-type https gitlab.openhelp.net
 ```
 
-A simple leaf-certificate export is:
+Add the GitLab CA certificate to Argo CD
 
 ```bash
-openssl s_client \
-  -showcerts \
-  -connect gitlab.openhelp.net:443 \
-  -servername gitlab.openhelp.net \
-  </dev/null 2>/dev/null |
-openssl x509 -outform PEM > gitlab.crt
+argocd cert add-tls   --from /root/gitlab-ca.crt   gitlab.openhelp.net
 ```
 
 The CA certificate is preferable because the server certificate may be renewed.
 
 ---
-
-## 26. Add the GitLab certificate to Argo CD
-
-Using a CA certificate:
-
-```bash
-argocd cert add-tls gitlab.openhelp.net \
-  --from openhelp-root-ca.crt
-```
-
-Lab fallback using the exported server certificate:
-
-```bash
-argocd cert add-tls gitlab.openhelp.net \
-  --from gitlab.crt
-```
 
 Verify:
 
@@ -920,7 +946,7 @@ argocd cert list
 You should see:
 
 ```text
-gitlab.openhelp.net   https   ...
+gitlab.openhelp.net      https  rsa                  CN=Certificate Authority,O=OPENHELP.NET
 ```
 
 Never use `--insecure-skip-server-verification` as a permanent production workaround.
@@ -936,7 +962,8 @@ In GitLab:
 ```text
 User avatar
 → Edit profile
-→ Access tokens
+→ Access
+→Personal Access tokens
 ```
 
 Create a token dedicated to Argo CD.
@@ -993,7 +1020,11 @@ Repository 'https://gitlab.openhelp.net/sreejith/microservices-e-commerce-eks-pr
 Verify:
 
 ```bash
-argocd repo list
+root@kube2:~# argocd repo list
+TYPE  NAME  REPO                                                                           INSECURE  OCI    LFS    CREDS  STATUS      MESSAGE  PROJECT
+git         https://gitlab.openhelp.net/sreejith/microservices-e-commerce-eks-project.git  false     false  false  false  Successful
+root@kube2:~#
+
 ```
 
 The connection status should be `Successful`.
