@@ -1110,9 +1110,10 @@ kubectl get applications -n argocd
 argocd app get microservices-ecommerce
 ```
 
-ui looks like the below
+once deployed you can see below ui
 
-<img width="997" height="592" alt="image" src="https://github.com/user-attachments/assets/d82f5577-c35a-4301-a6f7-0c17875453ff" />
+<img width="2212" height="1329" alt="image" src="https://github.com/user-attachments/assets/982f7873-dc95-4383-b35a-965b087403c0" />
+
 
 
 ### Why `targetRevision: main` instead of `HEAD`?
