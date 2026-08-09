@@ -1031,40 +1031,17 @@ The connection status should be `Successful`.
 The current `frontend.yaml` contains a Namespace object, but creating the namespace explicitly makes the sequence clear:
 
 ```bash
-kubectl create namespace dev --dry-run=client -o yaml |
-kubectl apply -f -
+kubectl create namespace dev
 ```
 
 ---
 
 ## 30. Create the Nexus image pull secret
 
-Use secure variables rather than placing a password directly in shell history:
-
 ```bash
-read -rp "Nexus username: " NEXUS_USERNAME
-read -rsp "Nexus password: " NEXUS_PASSWORD
-echo
+kubectl create secret docker-registry nexus-secret --docker-server=nexus.openhelp.net --docker-username=admin --docker-password='Li******!' -n dev
 ```
 
-Create or update the secret:
-
-```bash
-kubectl create secret docker-registry nexus-secret \
-  --namespace dev \
-  --docker-server=nexus.openhelp.net \
-  --docker-username="${NEXUS_USERNAME}" \
-  --docker-password="${NEXUS_PASSWORD}" \
-  --dry-run=client \
-  -o yaml |
-kubectl apply -f -
-```
-
-Clear the variables:
-
-```bash
-unset NEXUS_USERNAME NEXUS_PASSWORD
-```
 
 Verify:
 
