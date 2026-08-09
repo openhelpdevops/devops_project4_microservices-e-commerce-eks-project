@@ -251,63 +251,6 @@ tools {
 }
 ```
 
----
-
-### 3.2 Configure SonarQube Scanner
-
-Click:
-
-```text
-SonarQube Scanner installations → Add SonarQube Scanner
-```
-
-Configure:
-
-```text
-Name: sonar-scanner
-Install automatically: Enabled
-Installer: Install from Maven Central
-Version: SonarQube Scanner 8.1.0.6389
-```
-
-### Explanation
-
-The name `sonar-scanner` is later referenced by the Jenkins pipeline.
-
-Example:
-
-```groovy
-SCANNER_HOME = tool 'sonar-scanner'
-```
-
----
-
-### 3.3 Configure Maven
-
-Click:
-
-```text
-Maven installations → Add Maven
-```
-
-Configure:
-
-```text
-Name: Maven3.9.15
-Install automatically: Enabled
-Installer: Install from Apache
-Version: 3.9.15
-```
-
-### Explanation
-
-The name must match the Jenkinsfile tool declaration.
-
-```groovy
-tools {
-    maven 'Maven3.9.15'
-}
-```
 
 ---
 
@@ -350,35 +293,8 @@ Add credentials>> Username with password>> global
 
 ---
 
-### 4.1 GitLab Credentials
 
-Select:
-
-```text
-Kind: Username with password
-Scope: Global
-```
-
-Configure:
-
-```text
-Username: sreejith
-Password: <GITLAB_ACCESS_TOKEN>
-ID: sreejithgit
-Description: sreejithgit
-```
-
-### Explanation
-
-The password field stores the GitLab personal access token. The Jenkins pipeline refers to the credential by ID:
-
-```groovy
-credentialsId: 'sreejithgit'
-```
-
----
-
-### 4.2 Nexus Credentials
+### 4.1 Nexus Credentials
 
 Select:
 
@@ -408,7 +324,7 @@ Avoid using the Nexus administrator account in production. Create a dedicated se
 
 ---
 
-### 4.3 Gmail Credentials
+### 4.2 Gmail Credentials
 
 Select:
 
@@ -449,7 +365,7 @@ This is the one we configured with Gmail SMTP
 
 ---
 
-## 8. Configure Gmail SMTP in Jenkins
+## 4.3. Configure Gmail SMTP in Jenkins
 
 Navigate to:
 
