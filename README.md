@@ -1065,7 +1065,7 @@ The project manifests already specify `imagePullSecrets` in pod specs, so patchi
 
 ---
 
-# PART X — Create the Argo CD application
+# PART X — Create the Argo CD application from command line
 
 ## 31. Recommended declarative Application manifest
 
@@ -1110,15 +1110,20 @@ kubectl get applications -n argocd
 argocd app get microservices-ecommerce
 ```
 
+ui looks like the below
+
+<img width="997" height="592" alt="image" src="https://github.com/user-attachments/assets/d82f5577-c35a-4301-a6f7-0c17875453ff" />
+
+
 ### Why `targetRevision: main` instead of `HEAD`?
 
 `main` clearly documents the approved deployment branch. `HEAD` follows the repository default branch, which can be changed later and makes the deployment target less explicit.
 
 ---
 
-## 32. Create the application from the Argo CD UI
+## 32. Create the application from the Argo CD UI (Instead of step 31 use below) 
 
-Open:
+Open argocd ui:
 
 ```text
 https://192.168.0.242
