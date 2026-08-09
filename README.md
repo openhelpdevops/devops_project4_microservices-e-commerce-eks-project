@@ -1155,20 +1155,20 @@ kubectl run dns-test \
 For AMD64 Linux:
 
 ```bash
-wget \
+root@kube2:~# wget \
   https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
 ```
 
 Install it:
 
 ```bash
-sudo install -m 0555 argocd-linux-amd64 /usr/local/bin/argocd
+root@kube2:~# sudo install -m 0555 argocd-linux-amd64 /usr/local/bin/argocd
 ```
 
 Verify:
 
 ```bash
-argocd version --client
+root@kube2:~# argocd version --client
 ```
 
 > In production, pin and verify an approved CLI version matching your Argo CD server release.
@@ -1214,7 +1214,7 @@ Context '192.168.0.242' updated
 Download ca certificate from gitlab server
 
 ```text
-scp root@gitlab.openhelp.net:/etc/ipa/ca.crt /root/gitlab-ca.crt
+root@kube2:~# scp root@gitlab.openhelp.net:/etc/ipa/ca.crt /root/gitlab-ca.crt
 ```
 
 List the certificates
