@@ -1482,6 +1482,12 @@ Open:
 http://192.168.0.241
 ```
 
+
+ui looks like the below:-
+
+<img width="3289" height="1302" alt="image" src="https://github.com/user-attachments/assets/13eeb0e5-c432-4bd7-98cf-d289acd26ba0" />
+
+
 ---
 
 # PART XII — Test the complete GitOps deployment
