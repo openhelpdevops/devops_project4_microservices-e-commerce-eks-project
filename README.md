@@ -688,13 +688,6 @@ A browser warning is expected when the Argo CD API server presents its default s
 
 ## 19. Retrieve the initial Argo CD password
 
-Use:
-
-```bash
-argocd admin initial-password -n argocd
-```
-
-If the CLI is not installed yet:
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret \
@@ -743,7 +736,7 @@ kubectl run curl-test \
   -- curl -vk https://gitlab.openhelp.net
 ```
 
-If internal DNS already resolves the hostname, no CoreDNS `hosts` entry is needed.
+If internal DNS already resolves the hostname, no CoreDNS `hosts` entry is needed. its failed so goahread with below steps
 
 ---
 
