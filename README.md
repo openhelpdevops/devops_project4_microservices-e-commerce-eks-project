@@ -398,6 +398,23 @@ Port `465` uses SMTP over SSL. The `mail-cred` Jenkins credential supplies the G
 
 ---
 
+### Configure Maven in Jenkins
+
+Navigation:
+
+```text
+Manage Jenkins
+  → Tools
+  → Maven installations
+  → Add Maven
+```
+
+Configuration:
+
+```text
+Name: Maven3.9.15
+Binary: maven3.9.15
+```
 
 
 
