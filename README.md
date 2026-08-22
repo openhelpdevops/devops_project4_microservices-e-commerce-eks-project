@@ -1,4 +1,4 @@
-# GitOps Deployment with Jenkins, GitLab, Nexus, Argo CD, MetalLB, and Kubernetes
+# GitOps Deployment with Jenkins, GitLab, Nexus, Argo CD, MetalLB, and Kubernetes (Baremetal Deployment)
 
 > **Environment:** In-house data center Kubernetes cluster  
 > **Application:** Microservices e-commerce platform  
